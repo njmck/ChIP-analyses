@@ -178,57 +178,6 @@ bash fastq-process.sh
 
 Note: You will need [BiocManager](https://www.bioconductor.org/install/) to install packages from Bioconductor. BiocManager requires the ‘deldir’ library to be installed. But at the time of making this guide, version 1.0.5 for MacOS does not work for Intel processors, as it automatically downloads the ARM64 version if using install.packages(). Install manually by downloading the x86_64 .tgz from CRAN and through RStudio > Tools > Install Packages if using an Intel CPU.
 
-Create an object called 'si' that represents the mouse genome:
-```{code_2-1-1}
-workDirectory <- "~/biocond-ChIP-seq"
-setwd(workDirectory)
-
-# BiocManager::install("BSgenome.Mmusculus.UCSC.mm9")
-library(BSgenome.Mmusculus.UCSC.mm9)
-genome <- BSgenome.Mmusculus.UCSC.mm9
-si <- seqinfo(genome)
-si <- si[paste0('chr', c(1:19, 'X', 'Y'))]
-```
-
-#### 2.2 - Obtaining object bm for mm9
-
-Generate an object bm that represents mouse genome mm9:
-```{code_2-2-1}
-# BiocManager::install("biomaRt")
-library(biomaRt)
-# BiocManager::install("Gviz")
-library(Gviz)
-
-mart <- useMart("ensembl", dataset="mmusculus_gene_ensembl")
-
-fm <- Gviz:::.getBMFeatureMap()
-fm["symbol"] <- "external_gene_name"
-
-bm <- Gviz::BiomartGeneRegionTrack(chromosome='chr6', genome="mm9", 
-                             start=122530000, end = 122900000, 
-                             biomart=mart,filter=list("with_refseq_mrna"=TRUE), 
-                             size=4, name="RefSeq", utr5="red3", utr3="red3", 
-                             protein_coding="black", col.line=NULL, cex=7,
-                             collapseTranscripts="longest",
-                             featureMap=fm)
-```
-
-#### 2.3 - Promoter isolation
-
-Create the egs object, which contains the annotation of the most external 5 and 3 prime UTRs for each gene model:
-```{code_2-3-1}
-listAttributes(mart)[1:3,]
-ds <- useDataset('mmusculus_gene_ensembl', mart=mart)
-chroms <- 6
-
-egs <- getBM(attributes = c('ensembl_gene_id',"external_gene_name",
-                           'chromosome_name','start_position',
-                           'end_position','strand'), 
-                           filters='chromosome_name',
-                           values=chroms,
-                           mart=ds)
-```
-
 ### 3.0 - Reading the filtered ChIP-seq reads
 
 Read each bed file into R:
@@ -242,6 +191,12 @@ rep1 <- import.bed(file.path(workDirectory, 'SRR066766_filtered_ucsc_chr6.bed'))
 rep2 <- import.bed(file.path(workDirectory, 'SRR066767_filtered_ucsc_chr6.bed'))
 
 rep1
+```
+
+```{n}
+length(input)
+length(rep1)
+length(rep2)
 ```
 
 ### 4.0 - Preparation of the ChIP-seq and control samples: read extension
@@ -266,6 +221,63 @@ rep1
 ```
 
 ### 5.0 - Binning the ChIP-seq and control
+Create an object called 'si' that represents the mouse genome:
+```{code_2-1-1}
+workDirectory <- "~/biocond-ChIP-seq"
+setwd(workDirectory)
+
+# BiocManager::install("BSgenome.Mmusculus.UCSC.mm9")
+library(BSgenome.Mmusculus.UCSC.mm9)
+genome <- BSgenome.Mmusculus.UCSC.mm9
+si <- seqinfo(genome)
+si <- si[paste0('chr', c(1:19, 'X', 'Y'))]
+```
+
+#### 2.2 - Obtaining object bm for mm9
+
+Generate an object bm that represents mouse genome mm9:
+```{code_2-2-1}
+# BiocManager::install("biomaRt")
+library(biomaRt)
+# BiocManager::install("Gviz")
+library(Gviz)
+
+mart <- useMart(biomart='ENSEMBL_MART_ENSEMBL',
+                dataset = "mmusculus_gene_ensembl",
+                host="https://feb2014.archive.ensembl.org")
+
+mart_attr <- mart
+
+fm <- Gviz:::.getBMFeatureMap()
+fm["symbol"] <- "external_gene_id"
+
+bm <- Gviz::BiomartGeneRegionTrack(chromosome='chr6',
+                                   genome="mm9", 
+                             start=122530000, end = 122900000, 
+                             biomart=mart,filter=list("with_ox_refseq_mrna"=TRUE), 
+                             size=4, name="RefSeq", utr5="red3", utr3="red3", 
+                             protein_coding="black", col.line=NULL, cex=7,
+                             collapseTranscripts="longest",
+                             featureMap=fm)
+```
+
+#### 2.3 - Promoter isolation
+
+Create the egs object, which contains the annotation of the most external 5 and 3 prime UTRs for each gene model:
+```{code_2-3-1}
+listAttributes(mart)[1:3,]
+ds <- useDataset('mmusculus_gene_ensembl', mart=mart)
+chroms <- 6
+
+egs <- getBM(attributes = c('ensembl_gene_id',"external_gene_id",
+                           'chromosome_name','start_position',
+                           'end_position','strand'), 
+                           filters='chromosome_name',
+                           values=chroms,
+                           mart=ds)
+```
+
+
 
 #### 5.1 - Generation of bins
 
@@ -295,7 +307,7 @@ rep1.200bins
 
 library(ggplot2)
 # 1. Open file
-png("img/5-2_rep1_chr6_200bins.png", width = 1500, height = 1500)
+png("img/5-2_rep1_chr6_200bins_2014.png", width = 1500, height = 1500)
 # 2. Create the plot
 rep1_200bins_df <- data.frame(chr6=200000:201000, counts_per_bin=rep1.200bins$score[200000:201000])
 ggplot(rep1_200bins_df, aes(x=chr6, y=counts_per_bin)) +
@@ -339,7 +351,7 @@ bm
 AT <- GenomeAxisTrack()
 
 # 1. Open file
-png("img/6-0_log2-fold-changes-p-value.png",
+png("img/6-0_log2-fold-changes-p-value_2014.png",
     width=2000,
     height=2000,
     res=300,
@@ -376,7 +388,7 @@ rep2.track <- DataTrack(rep2.200bins,
                         cex.axis=0.4, ylim=c(0,150))
 
 # 1. Open file
-png("img/6-0_tracks-with-genomic-features.png",
+png("img/6-0_tracks-with-genomic-features_2014.png",
     width=2000,
     height=2000,
     res=300,
@@ -418,7 +430,7 @@ peaks2.track <- AnnotationTrack(peaks.rep2,
                                shape='box',fill='blue3',size=2)
 
 # 1. Open file
-png("img/7-2_macs-chip-peaks.png",
+png("img/7-2_macs-chip-peaks_2014.png",
     width=2000,
     height=2000,
     res=300,
